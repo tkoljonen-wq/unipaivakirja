@@ -8,7 +8,7 @@ Osoite: https://tkoljonen-wq.github.io/unipaivakirja/
 
 - **Aamukysely** (Aloita kysely): kysymykset tulevat yksi kerrallaan, ja minkä tahansa voi ohittaa.
   - Pikavalinnat *Otin unilääkkeen* ja *Otin melatoniinin*, joihin voi lisätä nimen, annoksen ja ottamisajan (ei pakollisia).
-  - Vuoteeseenmeno, nukahtamisviive, heräämiskerrat, heräämisaika, valveaika, vuoteestanousu, yöunen laatu 1–5 ja vapaat huomiot.
+  - Nukuinko yksin vai Timpan kanssa, vuoteeseenmeno, nukahtamisviive, heräämiskerrat, heräämisaika, valveaika, vuoteestanousu, yöunen laatu 1–5 ja vapaat huomiot.
   - Vuoteessaoloaika ja uniaika lasketaan automaattisesti. Niitä voi korjata käsin.
   - Kirjaus tallentuu heräämispäivälle, ja päivää voi vaihtaa.
 - **Iltakysely**: päivän vireys 1–5, päivän kulku ja muut huomiot. Yöllä ennen klo 4 tehty kirjaus menee edelliselle päivälle.

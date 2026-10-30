@@ -403,6 +403,8 @@ function fieldHtml(q, d) {
         <input type="number" inputmode="numeric" min="0" max="59" class="num-input sm" data-hm="${q.key}" data-part="m" value="${m}" placeholder="min"><span class="unit">min</span>
         ${has ? `<button class="chip" data-clear="${q.key}">Käytä laskettua</button>` : ''}</div>`;
     }
+    case 'choice':
+      return head + `<div class="toggle-row">${q.options.map(o => `<button class="toggle ${d[q.key] === o.val ? 'on' : ''}" data-choice="${q.key}" data-val="${o.val}">${o.icon} ${esc(o.label)}</button>`).join('')}</div>`;
     case 'text':
       return head + textFieldHtml(q.key, q.key, d[q.key], 4);
     case 'meds':
@@ -498,6 +500,11 @@ function bindQuiz() {
     setPath(z.data, k, b.hasAttribute('data-toggle') && getPath(z.data, k) === v ? undefined : v);
     redraw();
   }));
+  root.querySelectorAll('[data-choice]').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.choice, v = b.dataset.val;
+    setPath(z.data, k, z.data[k] === v ? undefined : v);
+    redraw();
+  }));
   root.querySelectorAll('[data-inc]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.inc;
     z.data[k] = Math.max(0, (z.data[k] ?? 0) + (z.data[k] == null && Number(b.dataset.by) < 0 ? 0 : Number(b.dataset.by)));
@@ -561,6 +568,8 @@ function changeQuizDate() {
 }
 
 // Yhteenveto vastauksista (kyselyn lopussa ja historian päivänäkymässä)
+const choiceLabel = (key, v) => MORNING.find(q => q.key === key)?.options.find(o => o.val === v)?.label;
+
 function summaryHtml(kind, d, inQuiz) {
   if (!d || !hasValues(d)) return '<p class="muted">Ei vastauksia.</p>';
   const rows = [];
@@ -573,6 +582,7 @@ function summaryHtml(kind, d, inQuiz) {
       const det = [v.name, v.dose, v.time && 'klo ' + fmtClock(v.time)].filter(Boolean).map(esc).join(', ');
       add(m.short, v.taken ? `${m.icon} Kyllä${det ? ` – ${det}` : ''}` : 'Ei');
     }
+    add('Nukuin', show(choiceLabel('company', d.company)));
     add('Vuoteeseenmeno', show(d.bedTime && fmtClock(d.bedTime)));
     add('Nukahtamisviive', show(d.latency != null ? fmtDur(d.latency) : ''));
     add('Heräämiskerrat', show(d.awakenings));

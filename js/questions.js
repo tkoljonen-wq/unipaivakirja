@@ -1,7 +1,7 @@
 // Kyselyjen kysymykset (Mielenterveystalo.fi: Unettomuuden omahoito-ohjelma, Harjoitus: Unipäiväkirja)
 //
 // Tyypit: meds (lääke-pikavalinnat), time (kellonaika), duration (minuutit), count (lukumäärä),
-// calc (laskettu kesto, jota voi korjata), scale (1–5), text (vapaa teksti + vakiovastaukset)
+// calc (laskettu kesto, jota voi korjata), scale (1–5), choice (yksi vaihtoehto), text (vapaa teksti + vakiovastaukset)
 
 export const MEDS = [
   { key: 'sleepMed', label: 'Otin unilääkkeen', short: 'Unilääke', icon: '💊' },
@@ -10,6 +10,10 @@ export const MEDS = [
 
 export const MORNING = [
   { key: 'meds', type: 'meds', title: 'Lääkkeet', help: 'Valitse, jos otit illalla tai yöllä. Lisätiedot eivät ole pakollisia.' },
+  { key: 'company', type: 'choice', title: 'Nukuitko yksin vai Timpan kanssa?', options: [
+    { val: 'yksin', label: 'Yksin', icon: '🛏️' },
+    { val: 'timppa', label: 'Timpan kanssa', icon: '👫' },
+  ] },
   { key: 'bedTime', type: 'time', title: 'Vuoteeseenmenoaika', help: 'Mihin aikaan menin nukkumaan?' },
   { key: 'latency', type: 'duration', title: 'Nukahtamisviive', help: 'Kuinka kauan minulla kesti nukahtaa?', chips: [5, 10, 15, 20, 30, 45, 60, 90] },
   { key: 'awakenings', type: 'count', title: 'Heräämiskerrat', help: 'Kuinka monta kertaa heräsin kesken unien?' },
