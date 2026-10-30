@@ -1,0 +1,4 @@
+.claude/
+.firebase/
+*.pdf
+firebase-debug.log

@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Sovellusta saavat käyttää vain nämä Google-tilit
+    function allowed() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['tkoljonen@gmail.com', 'koljonen.pia@gmail.com'];
+    }
+
+    // Jokainen näkee ja muokkaa vain omia tietojaan (users/{oma uid}/...).
+    match /users/{uid}/{collection}/{docId} {
+      allow read, write: if allowed() && request.auth.uid == uid;
+    }
+
+    // Kaikki muu on kielletty
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
