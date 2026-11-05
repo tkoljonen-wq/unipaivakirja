@@ -2,7 +2,7 @@
 import { MEDS } from './questions.js';
 import {
   today, addDays, fmtDate, weekdayShort, weekStart, fmtDur, fmtClock, fmtTime, eventDate,
-  inBedOf, sleepOf, efficiencyOf, avg, esc, pad,
+  inBedOf, sleepOf, efficiencyOf, avg, esc, pad, latencyOf, awakeOf,
 } from './util.js';
 
 const RANGES = [[7, '7 pv'], [14, '14 pv'], [30, '30 pv'], [90, '90 pv']];
@@ -20,7 +20,7 @@ function collect(S, days) {
     rows.push({
       date, m, e, evs,
       sleep: sleepOf(m), inBed: inBedOf(m), eff: efficiencyOf(m),
-      latency: m.latency ?? null, awakenings: m.awakenings ?? null,
+      latency: latencyOf(m), awakenings: m.awakenings ?? null,
       quality: m.quality ?? null, alertness: e.alertness ?? null,
       coffee: coffees.length, tea: evs.filter(x => x.type === 'tee').length,
       neuro: evs.filter(x => x.type === 'neurosonic'),
@@ -181,10 +181,10 @@ function weekTable(S) {
   const rows = [
     ['Nukuin', d => ({ yksin: 'Yksin', timppa: 'Timppa' })[M(d).company] || ''],
     ['Vuoteeseenmenoaika', d => fmtClockOr(M(d).bedTime)],
-    ['Nukahtamisviive', d => durOr(M(d).latency)],
+    ['Nukahtamisviive', d => durOr(latencyOf(M(d)))],
     ['Heräämiskerrat', d => M(d).awakenings ?? ''],
     ['Heräämisaika', d => fmtClockOr(M(d).wakeTime)],
-    ['Valveaika', d => durOr(M(d).wakeAwake)],
+    ['Valveaika', d => durOr(awakeOf(M(d)))],
     ['Vuoteestanousuaika', d => fmtClockOr(M(d).outOfBed)],
     ['Vuoteessaoloaika', d => durOr(inBedOf(M(d)))],
     ['Uniaika', d => durOr(sleepOf(M(d)))],
@@ -236,7 +236,7 @@ export function exportJson(S) {
 export function exportCsv(S) {
   const dates = [...new Set([...Object.keys(S.days), ...S.events.map(eventDate)])].sort();
   const head = ['Päivä', 'Viikonpäivä', 'Unilääke', 'Unilääke nimi', 'Unilääke annos', 'Unilääke klo', 'Melatoniini', 'Melatoniini nimi', 'Melatoniini annos', 'Melatoniini klo',
-    'Nukuin', 'Vuoteeseenmeno', 'Nukahtamisviive min', 'Heräämiskerrat', 'Heräämisaika', 'Valveaika min', 'Vuoteestanousu', 'Vuoteessaoloaika min', 'Uniaika min', 'Unen laatu', 'Huomioita yöstä',
+    'Nukuin', 'Vuoteeseenmeno', 'Nukahtamisaika', 'Nukahtamisviive min', 'Heräämiskerrat', 'Valve yöllä min', 'Heräämisaika', 'Valveaika yht. min', 'Vuoteestanousu', 'Vuoteessaoloaika min', 'Uniaika min', 'Unen laatu', 'Huomioita yöstä',
     'Vireys', 'Päivän kulku', 'Muita huomioita', 'Kahvit', 'Kahvien ajat', 'Teet', 'Teiden ajat', 'Neurosonic'];
   const q = v => { const s = v == null ? '' : String(v); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const lines = dates.map(d => {
@@ -245,7 +245,7 @@ export function exportCsv(S) {
     const of = t => evs.filter(x => x.type === t);
     const med = k => [m[k]?.taken == null ? '' : m[k].taken ? 'kyllä' : 'ei', m[k]?.name, m[k]?.dose, m[k]?.time];
     return [d, weekdayShort(d), ...med('sleepMed'), ...med('melatonin'),
-      ({ yksin: 'yksin', timppa: 'Timpan kanssa' })[m.company], m.bedTime, m.latency, m.awakenings, m.wakeTime, m.wakeAwake, m.outOfBed, inBedOf(m), sleepOf(m), m.quality, m.morningNote,
+      ({ yksin: 'yksin', timppa: 'Timpan kanssa' })[m.company], m.bedTime, m.sleepOnset, latencyOf(m), m.awakenings, m.nightAwake, m.wakeTime, awakeOf(m), m.outOfBed, inBedOf(m), sleepOf(m), m.quality, m.morningNote,
       e.alertness, e.dayNotes, e.otherNotes,
       of('kahvi').length, of('kahvi').map(x => fmtTime(x.at)).join(' '), of('tee').length, of('tee').map(x => fmtTime(x.at)).join(' '),
       of('neurosonic').map(x => `${fmtTime(x.at)} ${x.program} ${x.minutes} min`).join(', '),

@@ -2,7 +2,7 @@
 // Origin (tkoljonen-wq.github.io) on jaettu muiden sovellusten kanssa → välimuistilla oma etuliite,
 // ja vain tämän sovelluksen vanhat välimuistit poistetaan.
 const CACHE_PREFIX = 'unipaivakirja-';
-const CACHE_NAME = CACHE_PREFIX + 'v1';
+const CACHE_NAME = CACHE_PREFIX + 'v2';
 
 const ASSETS = [
   './',

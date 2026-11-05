@@ -50,11 +50,42 @@ export function calcInBed(m) {
 }
 export const inBedOf = m => num(m.inBed) ?? calcInBed(m);
 
-// Uniaika = vuoteessaoloaika − nukahtamisviive − valveaika
+// Kahden kellonajan erotus minuutteina (yli keskiyön)
+const diffMin = (from, to) => { const a = toMin(from), b = toMin(to); return a == null || b == null ? null : (b - a + 1440) % 1440; };
+
+// Nukahtamisviive: uusissa kirjauksissa nukahtamisaika − vuoteeseenmeno, vanhoissa suoraan minuutteina
+export const latencyOf = m => m.sleepOnset ? diffMin(m.bedTime, m.sleepOnset) : num(m.latency);
+
+// Aamun valve: viimeisestä heräämisestä vuoteesta nousuun (yli 12 h tulkitaan syöttövirheeksi)
+export const morningAwakeOf = m => { const v = diffMin(m.wakeTime, m.outOfBed); return v != null && v <= 720 ? v : null; };
+
+// Yön valve (heräämisten aikana). Vanhoissa kirjauksissa wakeAwake sisälsi myös aamun valveen.
+const isNew = m => m.nightAwake !== undefined || m.sleepOnset !== undefined;
+export const nightAwakeOf = m => num(m.nightAwake);
+
+// Valveaika yhteensä nukahtamisen jälkeen = yön valve + aamun valve
+export const awakeOf = m => isNew(m) ? (num(m.nightAwake) || 0) + (morningAwakeOf(m) || 0) : num(m.wakeAwake);
+
+// Uniaika = vuoteessaoloaika − nukahtamisviive − yön valve − aamun valve
 export function calcSleep(m) {
   const bed = inBedOf(m);
   if (bed == null) return null;
-  return Math.max(0, bed - (num(m.latency) || 0) - (num(m.wakeAwake) || 0));
+  return Math.max(0, bed - (latencyOf(m) || 0) - (awakeOf(m) || 0));
+}
+
+// Laskun erittely ja varoitukset epäuskottavista luvuista
+export function sleepCheck(m) {
+  const bed = inBedOf(m), lat = latencyOf(m), night = isNew(m) ? num(m.nightAwake) : null, morn = isNew(m) ? morningAwakeOf(m) : null;
+  const warn = [];
+  if (m.sleepOnset && lat != null && bed != null && lat > bed) warn.push('Nukahtamisaika on vuoteestanousun jälkeen tai ennen vuoteeseenmenoa – tarkista ajat.');
+  else if (lat != null && lat > 360) warn.push(`Nukahtamisviive on ${fmtDur(lat)} – onko nukahtamisaika oikein?`);
+  const wk = diffMin(m.wakeTime, m.outOfBed);
+  if (wk != null && wk > 720) warn.push('Heräämisaika on vuoteestanousun jälkeen – tarkista ajat.');
+  const aw = num(m.awakenings);
+  if (aw >= 2 && night != null && night < aw * 5) warn.push(`Heräsit ${aw} kertaa, mutta yön valveaikaa on vain ${fmtDur(night)}. Laske mukaan kaikki hereillä olo heräämisten aikana.`);
+  if (aw === 0 && night > 0) warn.push('Valveaikaa on kirjattu, vaikka heräämiskertoja on 0.');
+  if (bed != null && (lat || 0) + (awakeOf(m) || 0) > bed) warn.push('Valveajat ovat yhteensä pidemmät kuin vuoteessaoloaika – tarkista luvut.');
+  return { bed, lat, night, morn, legacyAwake: isNew(m) ? null : num(m.wakeAwake), sleep: calcSleep(m), warn };
 }
 export const sleepOf = m => num(m.sleep) ?? calcSleep(m);
 

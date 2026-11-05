@@ -4,6 +4,7 @@ import { MORNING, EVENING, MEDS, SCALE_LABELS, NEUROSONIC, EVENT_TYPES, PHRASE_F
 import {
   today, addDays, fmtDate, fmtDateLong, fmtTime, fmtDur, fmtClock, nowTime, pad, isoDate,
   eveningDefaultDate, eventDate, calcInBed, calcSleep, inBedOf, sleepOf, weekdayShort, esc,
+  latencyOf, awakeOf, sleepCheck,
 } from './util.js';
 import { renderReports, bindReports, exportJson, exportCsv } from './report.js';
 
@@ -377,11 +378,12 @@ function fieldHtml(q, d) {
     case 'time':
       return head + `<div class="row"><input type="time" class="time-input" data-path="${q.key}" value="${esc(d[q.key] || '')}">
         <button class="chip" data-now="${q.key}">Nyt</button><button class="chip" data-clear="${q.key}">Tyhjennä</button></div>`;
-    case 'duration':
-      return head + `<div class="row"><input type="number" inputmode="numeric" min="0" max="1440" class="num-input" data-path="${q.key}" value="${d[q.key] ?? ''}" placeholder="min"><span class="unit">min</span>
-        <span class="dur-hint muted" data-durhint="${q.key}">${d[q.key] >= 60 ? fmtDur(d[q.key]) : ''}</span></div>
+    case 'duration': {
+      const v = d[q.key], has = v !== undefined && v !== null && v !== '';
+      return head + hmInputs(q.key, has ? Math.floor(v / 60) : '', has ? v % 60 : '') + `
         <div class="chips">${q.chips.map(c => `<button class="chip ${Number(d[q.key]) === c && d[q.key] !== '' && d[q.key] != null ? 'on' : ''}" data-set="${q.key}" data-val="${c}">${c >= 60 ? fmtDur(c) : c + ' min'}</button>`).join('')}
         <button class="chip" data-clear="${q.key}">Tyhjennä</button></div>`;
+    }
     case 'count': {
       const v = d[q.key];
       return head + `<div class="stepper"><button class="step-btn" data-inc="${q.key}" data-by="-1">−</button>
@@ -398,10 +400,9 @@ function fieldHtml(q, d) {
       return head + `<div class="calc-box"><span class="muted small">${has ? 'Korjattu käsin' : 'Laskettu'}</span>
         <b class="calc-val" data-calcval="${q.key}">${fmtDur(has ? manual : auto)}</b>
         ${auto == null && !has ? '<span class="muted small">Täytä ensin vuoteeseenmeno- ja nousuaika.</span>' : ''}</div>
+        ${q.calc === 'sleep' ? `<div data-breakdown>${sleepBreakdownHtml(d)}</div>` : ''}
         <p class="label">Korjaa tarvittaessa</p>
-        <div class="row"><input type="number" inputmode="numeric" min="0" max="24" class="num-input sm" data-hm="${q.key}" data-part="h" value="${h}" placeholder="h"><span class="unit">h</span>
-        <input type="number" inputmode="numeric" min="0" max="59" class="num-input sm" data-hm="${q.key}" data-part="m" value="${m}" placeholder="min"><span class="unit">min</span>
-        ${has ? `<button class="chip" data-clear="${q.key}">Käytä laskettua</button>` : ''}</div>`;
+        ${hmInputs(q.key, h, m, has ? `<button class="chip" data-clear="${q.key}">Käytä laskettua</button>` : '')}`;
     }
     case 'choice':
       return head + `<div class="toggle-row">${q.options.map(o => `<button class="toggle ${d[q.key] === o.val ? 'on' : ''}" data-choice="${q.key}" data-val="${o.val}">${o.icon} ${esc(o.label)}</button>`).join('')}</div>`;
@@ -425,6 +426,30 @@ function fieldHtml(q, d) {
       }).join('');
   }
   return head;
+}
+
+// Kesto tunteina ja minuutteina (arvo tallennetaan minuutteina)
+function hmInputs(key, h, m, extra = '') {
+  return `<div class="row"><input type="number" inputmode="numeric" min="0" max="24" class="num-input sm" data-hm="${key}" data-part="h" value="${h}" placeholder="h"><span class="unit">h</span>
+    <input type="number" inputmode="numeric" min="0" max="59" class="num-input sm" data-hm="${key}" data-part="m" value="${m}" placeholder="min"><span class="unit">min</span>
+    ${extra}</div>`;
+}
+
+// Uniajan laskun erittely ja varoitukset
+function sleepBreakdownHtml(d) {
+  const c = sleepCheck(d);
+  if (c.bed == null) return '';
+  const line = (label, v, op = '−') => `<tr><th>${op} ${esc(label)}</th><td>${v == null ? '<span class="muted">–</span>' : fmtDur(v)}</td></tr>`;
+  const rows = [
+    `<tr><th>Vuoteessaoloaika</th><td>${fmtDur(c.bed)}</td></tr>`,
+    line('Nukahtamisviive', c.lat),
+    ...(c.legacyAwake != null
+      ? [line('Valveaika', c.legacyAwake)]
+      : [line('Valve yöllä', c.night), line('Valve aamulla (herääminen → nousu)', c.morn)]),
+    `<tr class="total"><th>= Uniaika</th><td>${fmtDur(c.sleep)}</td></tr>`,
+  ];
+  return `<table class="breakdown">${rows.join('')}</table>
+    ${c.warn.map(w => `<p class="warn">⚠️ ${esc(w)}</p>`).join('')}`;
 }
 
 // Vapaa tekstikenttä + vakiovastaukset (fraasit) + "Tallenna vakiovastaukseksi"
@@ -460,6 +485,10 @@ function bindQuiz() {
       const k = el.dataset.calcval, man = z.data[k];
       el.textContent = fmtDur(man != null && man !== '' ? man : (k === 'inBed' ? calcInBed(z.data) : calcSleep(z.data)));
     });
+    root.querySelectorAll('[data-breakdown]').forEach(el => { el.innerHTML = sleepBreakdownHtml(z.data); });
+  };
+  const syncChips = k => {
+    root.querySelectorAll(`[data-set="${k}"]`).forEach(c => c.classList.toggle('on', z.data[k] != null && c.dataset.val === String(z.data[k])));
   };
 
   root.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => {
@@ -493,7 +522,7 @@ function bindQuiz() {
     const h = root.querySelector(`[data-hm="${k}"][data-part="h"]`).value, m = root.querySelector(`[data-hm="${k}"][data-part="m"]`).value;
     z.data[k] = (h === '' && m === '') ? undefined : (Number(h) || 0) * 60 + (Number(m) || 0);
     if (z.data[k] === undefined) delete z.data[k];
-    updateCalcs(); updateNextLabel();
+    syncChips(k); updateCalcs(); updateNextLabel();
   }));
   root.querySelectorAll('[data-set]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.set, v = Number(b.dataset.val);
@@ -584,10 +613,12 @@ function summaryHtml(kind, d, inQuiz) {
     }
     add('Nukuin', show(choiceLabel('company', d.company)));
     add('Vuoteeseenmeno', show(d.bedTime && fmtClock(d.bedTime)));
-    add('Nukahtamisviive', show(d.latency != null ? fmtDur(d.latency) : ''));
+    if (d.sleepOnset) add('Nukahtamisaika', show(fmtClock(d.sleepOnset)));
+    add('Nukahtamisviive', show(latencyOf(d) != null ? fmtDur(latencyOf(d)) : ''));
     add('Heräämiskerrat', show(d.awakenings));
+    if (d.nightAwake != null) add('Valve yöllä', show(fmtDur(d.nightAwake)));
     add('Heräämisaika', show(d.wakeTime && fmtClock(d.wakeTime)));
-    add('Valveaika', show(d.wakeAwake != null ? fmtDur(d.wakeAwake) : ''));
+    add('Valveaika yht.', show(awakeOf(d) != null ? fmtDur(awakeOf(d)) : ''));
     add('Vuoteestanousu', show(d.outOfBed && fmtClock(d.outOfBed)));
     add('Vuoteessaoloaika', show(inBedOf(d) != null ? fmtDur(inBedOf(d)) : ''));
     add('Uniaika', show(sleepOf(d) != null ? fmtDur(sleepOf(d)) : ''));
